@@ -1,0 +1,32 @@
+Pokémon: 17
+2 Pidgey MEW 16
+2 Charmander PAF 7
+1 Mew CEL 11
+1 Jirachi PAR 126
+2 Charmeleon PAF 8
+1 Rotom V CRZ 45
+2 Charmander OBF 26
+2 Pidgeot ex OBF 164
+1 Manaphy BRS 41
+3 Charizard ex OBF 125
+
+Trainer: 37
+1 Counter Catcher PAR 160
+1 Vengeful Punch OBF 197
+1 Artazon PAF 76
+4 Level Ball AOR 76
+1 Forest Seal Stone SIT 156
+3 Nest Ball SVI 181
+1 Temple of Sinnoh ASR 155
+4 Arven OBF 186
+1 Battle VIP Pass FST 225
+2 Boss's Orders PAL 172
+3 Iono PAL 185
+2 Super Rod PAL 188
+2 Lost Vacuum LOR 162
+1 Collapsed Stadium BRS 137
+4 Ultra Ball SVI 196
+1 Vitality Band SVI 197
+1 Switch SVI 194
+1 Professor Turo's Scenario PRE 121
+3 Rare Candy SVI 191

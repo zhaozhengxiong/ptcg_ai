@@ -65,17 +65,14 @@ pytest
 
 ```python
 from pathlib import Path
-from ptcg_ai.card_loader import CardLibrary
 from ptcg_ai.simulation import build_deck, load_rulebook_text, run_turn
 from ptcg_ai.player import PlayerAgent
 from ptcg_ai.referee import RefereeAgent
 
-library = CardLibrary.from_json(Path("doc/cards/en/sv3pt5.json"))
 rulebook = load_rulebook_text(Path("doc/rulebook_extracted.txt"))
 
-deck_entries = [(f"playerA-deck-{i:03d}", "SV3pt5", "001") for i in range(60)]
-deck_a = build_deck("playerA", deck_entries, library)
-deck_b = build_deck("playerB", deck_entries, library)
+deck_a = build_deck("playerA", Path("doc/deck/deck1.txt"))
+deck_b = build_deck("playerB", Path("doc/deck/deck1.txt"))
 
 referee = RefereeAgent.create(
     match_id="demo-001",
