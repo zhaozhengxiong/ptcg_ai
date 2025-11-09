@@ -30,6 +30,9 @@ class CardDefinition:
     hp: Optional[int] = None
     stage: Optional[str] = None
     rules_text: Optional[str] = None
+    subtypes: Optional[List[str]] = None
+    abilities: Optional[List[Dict[str, object]]] = None
+    attacks: Optional[List[Dict[str, object]]] = None
 
 
 @dataclass(slots=True)

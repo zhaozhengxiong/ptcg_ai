@@ -1,6 +1,7 @@
 """Database access helpers for persisting games and logs."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, Iterable, List, Optional
@@ -11,6 +12,28 @@ try:  # pragma: no cover - optional dependency
     import psycopg
 except Exception:  # pragma: no cover - optional dependency
     psycopg = None  # type: ignore
+
+
+def build_postgres_dsn() -> str:
+    """Build PostgreSQL DSN from environment variables.
+    
+    Reads the following environment variables:
+    - PGHOST (default: localhost)
+    - PGPORT (default: 5432)
+    - PGUSER (default: postgres)
+    - PGPASSWORD (default: postgres)
+    - PGDATABASE (default: ptcg)
+    
+    Returns:
+        PostgreSQL connection string in libpq format.
+    """
+    host = os.getenv("PGHOST", "localhost")
+    port = os.getenv("PGPORT", "5432")
+    user = os.getenv("PGUSER", "postgres")
+    password = os.getenv("PGPASSWORD", "postgres")
+    database = os.getenv("PGDATABASE", "ptcg")
+    
+    return f"host={host} port={port} user={user} password={password} dbname={database}"
 
 
 @dataclass
@@ -138,4 +161,4 @@ class DatabaseClient:
         return [GameLogEntry(*row) for row in rows]
 
 
-__all__ = ["DatabaseClient", "InMemoryDatabase"]
+__all__ = ["DatabaseClient", "InMemoryDatabase", "build_postgres_dsn"]
