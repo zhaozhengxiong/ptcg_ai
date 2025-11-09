@@ -756,6 +756,88 @@ class GameTools:
             "card_types": card_types,
             "zone": zone.value,
         }
+    
+    def query_opponent_bench(self, player_id: str) -> List[CardInstance]:
+        """Query opponent's bench Pokémon.
+        
+        Args:
+            player_id: The player requesting the query (opponent will be the other player)
+            
+        Returns:
+            List of Pokémon cards on opponent's bench
+        """
+        opponent_id = [p for p in self.state.players.keys() if p != player_id][0]
+        bench_zone = self.state.players[opponent_id].zone(Zone.BENCH)
+        return list(bench_zone.cards)
+    
+    def query_opponent_prize_count(self, player_id: str) -> int:
+        """Query opponent's remaining prize card count.
+        
+        Args:
+            player_id: The player requesting the query (opponent will be the other player)
+            
+        Returns:
+            Opponent's remaining prize count
+        """
+        opponent_id = [p for p in self.state.players.keys() if p != player_id][0]
+        return self.state.players[opponent_id].prizes_remaining
+    
+    def check_stadium_in_play(self, player_id: Optional[str] = None) -> Optional[CardInstance]:
+        """Check if a Stadium card is in play.
+        
+        Args:
+            player_id: Optional player ID. If provided, checks that player's Stadium zone.
+                      If None, checks both players' Stadium zones (only one should have a Stadium).
+            
+        Returns:
+            Stadium card instance if found, None otherwise
+        """
+        if player_id:
+            stadium_zone = self.state.players[player_id].zone(Zone.STADIUM)
+            if stadium_zone.cards:
+                return stadium_zone.cards[0]
+        else:
+            # Check both players
+            for p_id in self.state.players.keys():
+                stadium_zone = self.state.players[p_id].zone(Zone.STADIUM)
+                if stadium_zone.cards:
+                    return stadium_zone.cards[0]
+        return None
+    
+    def check_bench_full(self, player_id: str) -> bool:
+        """Check if player's bench is full (5 Pokémon).
+        
+        Args:
+            player_id: Owner of the bench
+            
+        Returns:
+            True if bench is full (5 Pokémon), False otherwise
+        """
+        bench_zone = self.state.players[player_id].zone(Zone.BENCH)
+        return len(bench_zone.cards) >= 5
+    
+    def discard_stadium(self, player_id: str) -> None:
+        """Discard the Stadium card in play (if any).
+        
+        Args:
+            player_id: Owner of the Stadium card to discard
+        """
+        stadium_zone = self.state.players[player_id].zone(Zone.STADIUM)
+        discard_zone = self.state.players[player_id].zone(Zone.DISCARD)
+        
+        if stadium_zone.cards:
+            stadium_card = stadium_zone.cards[0]
+            stadium_zone.cards.remove(stadium_card)
+            discard_zone.cards.append(stadium_card)
+            
+            self._log(
+                actor=self.context.referee_id,
+                action="discard_stadium",
+                payload={
+                    "player_id": player_id,
+                    "stadium_card": stadium_card.uid,
+                },
+            )
 
     # ------------------------------------------------------------------
     # logging helpers

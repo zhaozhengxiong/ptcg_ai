@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Any
 
 from .game_tools import GameTools
 from .models import CardInstance, GameState, Zone
@@ -18,6 +18,7 @@ class EffectContext:
     player_id: str
     card_instance: CardInstance
     target_player_id: Optional[str] = None  # For opponent effects
+    referee: Optional[Any] = None  # Optional RefereeAgent reference for ending turns
 
 
 class EffectExecutor:
@@ -25,6 +26,511 @@ class EffectExecutor:
     
     def __init__(self, context: EffectContext):
         self.context = context
+    
+    def execute_with_plan(self, plan: Any, selected_cards: Optional[List[str]] = None) -> Dict[str, object]:
+        """Execute card effect using a CardExecutionPlan.
+        
+        Args:
+            plan: CardExecutionPlan object from rule_analyst
+            selected_cards: Optional list of selected card UIDs (if selection was already made)
+            
+        Returns:
+            Result dict with execution status. May include requires_selection=True if player selection is needed.
+        """
+        from agents.rule_analyst.analyzer import CardExecutionPlan
+        
+        if not isinstance(plan, CardExecutionPlan):
+            return {"success": False, "message": "Invalid plan type"}
+        
+        # Execute validation rules
+        for validation in plan.validation_rules:
+            validation_result = self._execute_validation(validation)
+            if not validation_result.get("valid", True):
+                return {
+                    "success": False,
+                    "message": validation_result.get("error_message", "Validation failed")
+                }
+        
+        # Execute execution steps
+        result = {"success": True, "message": "Effect executed"}
+        executed_steps = []
+        
+        for step_idx, step in enumerate(plan.execution_steps):
+            # Check dependencies
+            depends_on = step.get("depends_on", [])
+            if depends_on:
+                for dep_idx in depends_on:
+                    if dep_idx >= len(executed_steps):
+                        return {"success": False, "message": f"Step {step_idx} depends on step {dep_idx} which hasn't been executed"}
+            
+            # Check if step should be skipped
+            skip_if = step.get("skip_if")
+            if skip_if:
+                # Simple skip conditions (can be extended)
+                if skip_if == "no_stadium":
+                    stadium = self.context.tools.check_stadium_in_play(self.context.player_id)
+                    if not stadium:
+                        continue
+            
+            # Execute step
+            step_result = self._execute_step(step, selected_cards, executed_steps)
+            
+            if not step_result.get("success", True):
+                return step_result
+            
+            # Check if step requires player selection
+            if step_result.get("requires_selection"):
+                return {
+                    "success": True,
+                    "requires_selection": True,
+                    "candidates": step_result.get("candidates", []),
+                    "selection_context": {
+                        "plan": plan,
+                        "step_index": step_idx,
+                        "executed_steps": executed_steps
+                    },
+                    "message": step_result.get("message", "Please select cards")
+                }
+            
+            executed_steps.append(step_result)
+            result.update(step_result)
+        
+        return result
+    
+    def _execute_validation(self, validation: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a validation rule."""
+        validation_type = validation.get("type")
+        
+        if validation_type == "in_active":
+            active = self.context.game_state.players[self.context.player_id].zone(Zone.ACTIVE)
+            if self.context.card_instance not in active.cards:
+                return {"valid": False, "error_message": validation.get("error_message", "Card must be in active spot")}
+        
+        elif validation_type == "energy_requirement":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "bench_full":
+            if self.context.tools.check_bench_full(self.context.player_id):
+                return {"valid": False, "error_message": validation.get("error_message", "Bench is full")}
+        
+        elif validation_type == "ability_used":
+            ability_name = validation.get("params", {}).get("ability_name", "")
+            usage_count = self.context.tools.get_usage_count(
+                self.context.player_id,
+                self.context.card_instance.uid,
+                "ability",
+                scope="turn"
+            )
+            if usage_count > 0:
+                return {"valid": False, "error_message": validation.get("error_message", f"Ability {ability_name} already used this turn")}
+        
+        elif validation_type == "ability_used_game":
+            ability_name = validation.get("params", {}).get("ability_name", "")
+            usage_count = self.context.tools.get_usage_count(
+                self.context.player_id,
+                self.context.card_instance.uid,
+                "ability",
+                scope="game"
+            )
+            if usage_count > 0:
+                return {"valid": False, "error_message": validation.get("error_message", f"Ability {ability_name} already used this game")}
+        
+        elif validation_type == "in_hand":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "supporter_used":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "first_turn_restriction":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "stadium_used":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "stadium_duplicate":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "tool_attached":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        elif validation_type == "energy_attachment_limit":
+            # This is checked by RefereeAgent before calling EffectExecutor
+            pass
+        
+        return {"valid": True}
+    
+    def _execute_step(self, step: Dict[str, Any], selected_cards: Optional[List[str]], executed_steps: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Execute a single execution step."""
+        step_type = step.get("step_type")
+        action = step.get("action")
+        params = step.get("params", {})
+        
+        if step_type == "validation":
+            # Validations are handled separately
+            return {"success": True}
+        
+        elif step_type == "query":
+            if action == "query_deck_candidates":
+                # This should return candidates for selection
+                criteria = params
+                candidates = self._query_deck_by_criteria(criteria)
+                return {
+                    "success": True,
+                    "requires_selection": True,
+                    "candidates": [{"uid": c.uid, "name": c.definition.name} for c in candidates],
+                    "message": f"Found {len(candidates)} candidates"
+                }
+            
+            elif action == "query_discard_candidates":
+                criteria = params
+                candidates = self._query_discard_by_criteria(criteria)
+                return {
+                    "success": True,
+                    "requires_selection": True,
+                    "candidates": [{"uid": c.uid, "name": c.definition.name} for c in candidates],
+                    "message": f"Found {len(candidates)} candidates"
+                }
+            
+            elif action == "query_opponent_bench":
+                bench_cards = self.context.tools.query_opponent_bench(self.context.player_id)
+                return {
+                    "success": True,
+                    "requires_selection": True,
+                    "candidates": [{"uid": c.uid, "name": c.definition.name} for c in bench_cards],
+                    "message": f"Found {len(bench_cards)} opponent bench Pokémon"
+                }
+            
+            elif action == "reveal_top_cards":
+                count = params.get("count", 1)
+                revealed = self.context.tools.reveal_top(self.context.player_id, count)
+                return {
+                    "success": True,
+                    "revealed": [c.uid for c in revealed],
+                    "revealed_cards": revealed
+                }
+        
+        elif step_type == "selection":
+            if selected_cards:
+                # Selection was already made
+                return {"success": True, "selected": selected_cards}
+            else:
+                # Need to wait for selection
+                max_count = params.get("max_count", 1)
+                min_count = params.get("min_count", 0)
+                # Get candidates from previous query step
+                candidates = []
+                for prev_step in executed_steps:
+                    if "candidates" in prev_step:
+                        candidates = prev_step["candidates"]
+                        break
+                
+                return {
+                    "success": True,
+                    "requires_selection": True,
+                    "candidates": candidates,
+                    "max_count": max_count,
+                    "min_count": min_count,
+                    "message": f"Please select {min_count} to {max_count} card(s)"
+                }
+        
+        elif step_type == "move":
+            if action == "move_cards":
+                if not selected_cards:
+                    return {"success": False, "message": "No cards selected"}
+                
+                source = params.get("source")
+                target = params.get("target")
+                
+                # Map target string to Zone
+                target_zone_map = {
+                    "hand": Zone.HAND,
+                    "bench": Zone.BENCH,
+                    "discard": Zone.DISCARD,
+                    "lost_zone": Zone.LOST_ZONE
+                }
+                target_zone = target_zone_map.get(target)
+                
+                if not target_zone:
+                    return {"success": False, "message": f"Unknown target zone: {target}"}
+                
+                # Find and move cards
+                moved_count = 0
+                for card_uid in selected_cards:
+                    card = self._find_card(card_uid, source)
+                    if card:
+                        source_zone_map = {
+                            "deck": Zone.DECK,
+                            "discard": Zone.DISCARD,
+                            "hand": Zone.HAND
+                        }
+                        source_zone = source_zone_map.get(source)
+                        if source_zone:
+                            self.context.tools.move_card(self.context.player_id, source_zone, target_zone, card)
+                            moved_count += 1
+                
+                return {"success": True, "moved": moved_count, "message": f"Moved {moved_count} card(s) to {target}"}
+            
+            elif action == "attach_energy":
+                if not selected_cards:
+                    return {"success": False, "message": "No energy card selected"}
+                # Energy attachment is handled by RefereeAgent
+                return {"success": True, "message": "Energy attachment ready"}
+            
+            elif action == "discard_stadium":
+                stadium = self.context.tools.check_stadium_in_play(self.context.player_id)
+                if stadium:
+                    self.context.tools.discard_stadium(self.context.player_id)
+                    return {"success": True, "message": "Stadium discarded"}
+                return {"success": True, "message": "No stadium to discard"}
+            
+            elif action == "switch_opponent_pokemon":
+                if not selected_cards:
+                    return {"success": False, "message": "No Pokémon selected"}
+                bench_card_id = selected_cards[0]
+                self.context.tools.swap_active_with_bench(self.context.player_id, bench_card_id, opponent=True)
+                return {"success": True, "message": "Opponent Pokémon switched"}
+        
+        elif step_type == "shuffle":
+            if action == "shuffle_deck":
+                self.context.tools.shuffle(self.context.player_id, Zone.DECK)
+                return {"success": True, "message": "Deck shuffled"}
+        
+        elif step_type == "draw":
+            if action == "draw_cards":
+                count = params.get("count", 1)
+                drawn = self.context.tools.draw(self.context.player_id, count)
+                return {"success": True, "drawn": [c.uid for c in drawn], "message": f"Drew {len(drawn)} card(s)"}
+            
+            elif action == "draw_cards_by_prizes":
+                prize_count = self.context.tools.query_prize_count(self.context.player_id)
+                drawn = self.context.tools.draw(self.context.player_id, prize_count)
+                return {"success": True, "drawn": [c.uid for c in drawn], "message": f"Drew {len(drawn)} card(s) based on prizes"}
+        
+        elif step_type == "damage":
+            if action == "calculate_and_apply_damage":
+                base_damage = params.get("base_damage", 0)
+                modifiers = params.get("damage_modifiers", [])
+                damage_calc = params.get("damage_calculation")  # 新的伤害计算信息
+                
+                total_damage = base_damage
+                for modifier in modifiers:
+                    if modifier.get("type") == "prize_based":
+                        opponent_id = [p for p in self.context.game_state.players.keys() if p != self.context.player_id][0]
+                        prize_count = self.context.tools.query_opponent_prize_count(self.context.player_id)
+                        bonus = modifier.get("bonus_per_prize", 0) * prize_count
+                        total_damage += bonus
+                    elif modifier.get("type") == "bonus_per":
+                        # 新的伤害计算模式：每X增加N点伤害
+                        condition = modifier.get("condition", "")
+                        bonus = modifier.get("bonus", 0)
+                        # 根据条件计算奖励（需要根据具体条件实现）
+                        # 例如：如果是 "Prize card your opponent has taken"，查询对手奖赏卡
+                        if "prize" in condition.lower() and "opponent" in condition.lower():
+                            prize_count = self.context.tools.query_opponent_prize_count(self.context.player_id)
+                            total_damage += bonus * prize_count
+                        # 可以添加更多条件处理
+                    elif modifier.get("type") == "bonus":
+                        # 新的伤害计算模式：增加N点伤害
+                        bonus = modifier.get("bonus", 0)
+                        total_damage += bonus
+                    elif modifier.get("type") == "self_damage":
+                        self_damage = modifier.get("amount", 0)
+                        self.context.tools.update_damage(self.context.card_instance.uid, self_damage)
+                        self.context.tools.check_ko(self.context.card_instance.uid)
+                    elif modifier.get("type") == "damage_to_multiple":
+                        # 新的伤害计算模式：对多个宝可梦造成伤害
+                        # 这个需要在 RefereeAgent 中处理，因为需要选择目标
+                        damage_per = modifier.get("damage", 0)
+                        count = modifier.get("count", 1)
+                        return {
+                            "success": True,
+                            "damage": damage_per,
+                            "damage_to_multiple": True,
+                            "count": count,
+                            "message": f"Damage {damage_per} to {count} opponent Pokémon"
+                        }
+                    elif modifier.get("type") == "attack_does_nothing":
+                        # 新的伤害计算模式：攻击无效
+                        return {
+                            "success": True,
+                            "damage": 0,
+                            "attack_does_nothing": True,
+                            "message": "Attack does nothing"
+                        }
+                
+                # Damage to target is handled by RefereeAgent
+                return {"success": True, "damage": total_damage, "message": f"Damage calculated: {total_damage}"}
+        
+        elif step_type == "attach":
+            if action == "attach_energy_cards":
+                if not selected_cards:
+                    # 如果没有选择能量卡，且步骤是可选的，则跳过
+                    if params.get("optional", False):
+                        return {"success": True, "skipped": True, "message": "No energy cards selected (optional step)"}
+                    return {"success": False, "message": "No energy cards selected"}
+                
+                allow_multiple_targets = params.get("allow_multiple_targets", False)
+                
+                if allow_multiple_targets:
+                    # 需要为每张能量卡选择目标宝可梦
+                    # 返回一个需要多次选择的结果
+                    return {
+                        "success": True,
+                        "requires_selection": True,
+                        "selection_type": "attach_energy",
+                        "energy_cards": selected_cards,
+                        "allow_multiple_targets": True,
+                        "message": f"Please select target Pokémon for each of {len(selected_cards)} energy card(s)"
+                    }
+                else:
+                    # 所有能量卡附着到同一个目标（需要选择目标）
+                    return {
+                        "success": True,
+                        "requires_selection": True,
+                        "selection_type": "attach_energy",
+                        "energy_cards": selected_cards,
+                        "allow_multiple_targets": False,
+                        "message": f"Please select target Pokémon for {len(selected_cards)} energy card(s)"
+                    }
+        
+        elif step_type == "check":
+            if action == "check_stadium_in_play":
+                stadium = self.context.tools.check_stadium_in_play(self.context.player_id)
+                return {"success": True, "stadium_exists": stadium is not None}
+        
+        elif step_type == "end_turn":
+            if action == "end_turn":
+                if self.context.referee:
+                    result = self.context.referee.end_turn(self.context.player_id)
+                    return {"success": True, "turn_ended": True, **result}
+                else:
+                    # 如果没有 referee 引用，返回标记让调用者处理
+                    return {"success": True, "turn_ended": True, "message": "Turn should end (no referee reference)"}
+        
+        elif step_type == "heal":
+            if action == "heal_damage":
+                amount = params.get("amount", "all")
+                target = params.get("target", "this Pokémon")
+                # 调用 GameTools 的 heal_damage 方法（如果存在）
+                if hasattr(self.context.tools, "heal_damage"):
+                    result = self.context.tools.heal_damage(self.context.player_id, self.context.card_instance.uid, amount, target)
+                    return {"success": True, "healed": amount, "message": f"Healed {amount} damage from {target}"}
+                else:
+                    # 如果方法不存在，返回标记让调用者处理
+                    return {"success": True, "healed": amount, "message": f"Heal {amount} damage from {target} (method not implemented)"}
+        
+        elif step_type == "move_damage_counters":
+            if action == "move_damage_counters":
+                count = params.get("count", "all")
+                source = params.get("source", "")
+                target = params.get("target", "")
+                # 调用 GameTools 的 move_damage_counters 方法（如果存在）
+                if hasattr(self.context.tools, "move_damage_counters"):
+                    result = self.context.tools.move_damage_counters(self.context.player_id, source, target, count)
+                    return {"success": True, "moved": count, "message": f"Moved {count} damage counters from {source} to {target}"}
+                else:
+                    # 如果方法不存在，返回标记让调用者处理
+                    return {"success": True, "moved": count, "message": f"Move {count} damage counters from {source} to {target} (method not implemented)"}
+        
+        elif step_type == "move_energy":
+            if action == "move_energy":
+                count = params.get("count", 1)
+                energy_type = params.get("energy_type")
+                source = params.get("source", "")
+                target = params.get("target", "")
+                # 调用 GameTools 的 move_energy 方法（如果存在）
+                if hasattr(self.context.tools, "move_energy"):
+                    result = self.context.tools.move_energy(self.context.player_id, source, target, count, energy_type)
+                    return {"success": True, "moved": count, "message": f"Moved {count} energy from {source} to {target}"}
+                else:
+                    # 如果方法不存在，返回标记让调用者处理
+                    return {"success": True, "moved": count, "message": f"Move {count} energy from {source} to {target} (method not implemented)"}
+        
+        elif step_type == "devolve":
+            if action == "devolve_pokemon":
+                target = params.get("target", "")
+                method = params.get("method", "")
+                # 调用 GameTools 的 devolve_pokemon 方法（如果存在）
+                if hasattr(self.context.tools, "devolve_pokemon"):
+                    result = self.context.tools.devolve_pokemon(self.context.player_id, target, method)
+                    return {"success": True, "devolved": True, "message": f"Devolved {target}"}
+                else:
+                    # 如果方法不存在，返回标记让调用者处理
+                    return {"success": True, "devolved": True, "message": f"Devolve {target} (method not implemented)"}
+        
+        return {"success": True, "message": "Step executed"}
+    
+    def _query_deck_by_criteria(self, criteria: Dict[str, Any]) -> List[CardInstance]:
+        """Query deck using criteria from plan."""
+        def predicate(card: CardInstance) -> bool:
+            if criteria.get("card_type"):
+                if card.definition.card_type != criteria["card_type"]:
+                    return False
+            if criteria.get("stage"):
+                if card.definition.stage != criteria["stage"]:
+                    return False
+            if criteria.get("max_hp") is not None:
+                if card.definition.card_type != "Pokemon" or card.definition.hp is None:
+                    return False
+                if card.definition.hp > criteria["max_hp"]:
+                    return False
+            if criteria.get("energy_type"):
+                if card.definition.card_type != "Energy":
+                    return False
+                if criteria["energy_type"] == "Basic Energy":
+                    if "Basic" not in (card.definition.subtypes or []):
+                        return False
+            if criteria.get("subtype"):
+                if card.definition.card_type != "Trainer":
+                    return False
+                if criteria["subtype"] not in (card.definition.subtypes or []):
+                    return False
+            return True
+        
+        return self.context.tools.deck_query(self.context.player_id, predicate)
+    
+    def _query_discard_by_criteria(self, criteria: Dict[str, Any]) -> List[CardInstance]:
+        """Query discard pile using criteria from plan."""
+        def predicate(card: CardInstance) -> bool:
+            if criteria.get("card_type"):
+                if card.definition.card_type != criteria["card_type"]:
+                    return False
+            if criteria.get("stage"):
+                if card.definition.stage != criteria["stage"]:
+                    return False
+            if criteria.get("energy_type"):
+                if card.definition.card_type != "Energy":
+                    return False
+                if criteria["energy_type"] == "Basic Energy":
+                    if "Basic" not in (card.definition.subtypes or []):
+                        return False
+            return True
+        
+        return self.context.tools.query_discard(self.context.player_id, predicate)
+    
+    def _find_card(self, card_uid: str, source: str) -> Optional[CardInstance]:
+        """Find a card by UID in the specified source zone."""
+        source_zone_map = {
+            "deck": Zone.DECK,
+            "discard": Zone.DISCARD,
+            "hand": Zone.HAND
+        }
+        source_zone = source_zone_map.get(source)
+        if not source_zone:
+            return None
+        
+        zone_state = self.context.game_state.players[self.context.player_id].zone(source_zone)
+        for card in zone_state.cards:
+            if card.uid == card_uid:
+                return card
+        return None
     
     def execute_ability(self, ability: Dict[str, object]) -> Dict[str, object]:
         """Execute a Pokémon ability.
