@@ -36,7 +36,7 @@ graph TD
 | **数据库层（Game DB）**          | 存储卡牌数据、对局记录、日志、玩家记忆等。                      |
 | **规则知识库（Rules KB）**        | 从官方规则PDF及 PostgreSQL 中的卡牌表（`ptcg.ptcg_cards`）提取信息，供裁判Agent推理使用。 |
 
-> ⚙️ 所有 Agent 基于 **OpenAI Agents SDK** 实现，统一调度接口、状态管理与消息格式，便于后续扩展与上线部署。
+> ⚙️ 所有 Agent 基于 **LangChain Agents** 实现，统一调度接口、状态管理与消息格式，支持多模型后端（OpenAI、Anthropic、智谱AI GLM-4.6、通义千问等），便于后续扩展与上线部署。
 
 ---
 
@@ -237,12 +237,12 @@ CREATE TABLE match_logs (
   * 识别常见违规模式。
   * 优化判定逻辑。
 
-> **记忆技术栈**：所有 Agent 记忆统一存入 PostgreSQL，结合 `pgvector` 扩展或向量服务（如 Qdrant）保存嵌入，并通过定期 Summarizer（基于 OpenAI Embeddings + 自回归模型）压缩历史，维持“短期缓存（最近 N 条原始事件）+ 长期摘要（向量检索）”的混合架构；工具集提供 `MemoryStore` API，允许 Agent 以 `uid`、时间戳、语义标签写入/查询记忆。
+> **记忆技术栈**：所有 Agent 记忆统一存入 PostgreSQL，结合 `pgvector` 扩展或向量服务（如 Qdrant）保存嵌入，并通过定期 Summarizer（基于多种嵌入模型 + 自回归模型，如 OpenAI Embeddings、智谱AI Embeddings 等）压缩历史，维持“短期缓存（最近 N 条原始事件）+ 长期摘要（向量检索）”的混合架构；工具集提供 `MemoryStore` API，允许 Agent 以 `uid`、时间戳、语义标签写入/查询记忆。
 
   * **嵌入生成**：默认调用 `text-embedding-3-large`（或开源等价模型）对每条记忆事件构建 3072 维向量；向量连同 `uid`、事件类型、发生回合、权重写入 `memory_embeddings` 表。为降低成本，可根据事件类型降采样（例如日志类每 3 条生成一次嵌入）。
   * **历史压缩（Summarizer）**：每局或每 10 条事件触发一次压缩任务，流程为：
     1. 读取该 Agent 最近 10~20 条原始事件。
-    2. 使用 `gpt-4.1`/`o4-mini` 等模型，按模板生成 structured summary（包含意图、情绪、关键行动、依赖关系），并打分确定“可遗忘度”。
+    2. 使用多种 LLM 模型（如 OpenAI GPT-4、Anthropic Claude、智谱AI GLM-4.6 等），按模板生成 structured summary（包含意图、情绪、关键行动、依赖关系），并打分确定“可遗忘度”。
     3. 将摘要再次生成嵌入并写入 `memory_embeddings`，原始事件标记为 `archived=true`，但仍可在需要时回溯。
   * **检索策略**：基于 pgvector 的 `cosine_distance` 执行 top-k 检索（默认 k=5），并设定阈值 `distance <= 0.35` 作为命中标准；若无结果命中，则退化到最近 N 条事件。示例 SQL：
 
@@ -260,11 +260,11 @@ CREATE TABLE match_logs (
 
 ## 十、工程结构规划
 
-> 工程采用模块化单仓（monorepo）形式，遵循“Agent（OpenAI Agents SDK）/工具集服务/数据库/知识库/基础设施”五大层划分，方便在 CI/CD 中做分阶段部署。
+> 工程采用模块化单仓（monorepo）形式，遵循“Agent（LangChain Agents）/工具集服务/数据库/知识库/基础设施”五大层划分，方便在 CI/CD 中做分阶段部署。
 
 ```
 ptcg_agents/
-├── agents/                    # 基于 OpenAI Agents SDK 的智能体实现
+├── agents/                    # 基于 LangChain Agents 的智能体实现
 │   ├── referee/               # 裁判Agent（流程控制、判定 orchestration、人工确认模式）
 │   └── players/               # 各类玩家Agent策略包（可多策略并行训练）
 ├── services/
@@ -293,7 +293,7 @@ ptcg_agents/
 
 ### 关键约束
 
-1. **Agent 层**：统一使用 OpenAI Agents SDK；Referee Agent 提供 Webhook/CLI 入口，玩家Agent以策略插件形式注册，允许在训练环境与线上环境复用。
+1. **Agent 层**：统一使用 LangChain Agents；支持多模型后端（OpenAI、Anthropic、智谱AI GLM-4.6、通义千问等），可通过配置灵活切换；Referee Agent 提供 Webhook/CLI 入口，玩家Agent以策略插件形式注册，允许在训练环境与线上环境复用。
 2. **服务层**：Game Tools、State Sync、Rule KB 均以独立微服务暴露 API，Referee Agent 通过服务网关调用，确保权限可控、易于水平扩展。
 3. **数据层**：PostgreSQL 作为单一事实来源；State Sync 负责事务封装，并将关键状态变化写入 `match_logs`，同时将卡牌 `uid` 与操作参数打包。
 4. **管理与监控**：Admin Console 必须对接人工确认模式，提供“逐步放开”配置、判例库浏览、告警推送；同时集成日志/指标上报（如 Prometheus + Grafana）。
@@ -314,7 +314,7 @@ ptcg_agents/
 
 | 模块 | 主要技术 | 说明 |
 | --- | --- | --- |
-| **Agents 层（Referee / Players）** | Python 3.11、OpenAI Agents SDK (Python)、FastAPI / Starlette、Redis Stream | 统一使用 Python 实现裁判与玩家策略，借助 OpenAI Agents SDK 完成任务编排；FastAPI/Starlette 提供 Webhook；Redis Stream 负责短期事件排队。 |
+| **Agents 层（Referee / Players）** | Python 3.11、LangChain Agents、LangChain OpenAI/Anthropic/Community、FastAPI / Starlette、Redis Stream | 统一使用 Python 实现裁判与玩家策略，借助 LangChain Agents 完成任务编排，支持多模型后端（OpenAI、Anthropic、智谱AI GLM-4.6、通义千问等）；FastAPI/Starlette 提供 Webhook；Redis Stream 负责短期事件排队。 |
 | **Game Tools 服务** | Python 3.11、FastAPI + gRPC（grpcio）、asyncio + uvloop、SQLAlchemy Core / asyncpg、Kafka | 通过 Python 异步栈实现高并发原子操作；如局部性能瓶颈可用 Rust/Python FFI。gRPC 接口供 Referee Agent 调用，同时将事件推送到 Kafka。 |
 | **State Sync 层** | Python 3.11、SQLAlchemy、PostgreSQL 15、pgvector | 封装数据库事务与一致性写入 match_state / match_logs；pgvector 存储记忆嵌入。 |
 | **Rule KB 服务** | Python 3.11、FastAPI、PyMuPDF、LangChain、Qdrant | 负责解析规则 PDF、读取 `ptcg_cards` 表并构建语义检索服务。 |

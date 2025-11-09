@@ -34,20 +34,20 @@ class RefereeAgentSDK:
         self.llm = llm
 
         default_instructions = """
-        You are a PTCG (Pokémon Trading Card Game) referee agent. Your role is to:
-        1. Validate player actions according to game rules
-        2. Enforce game rules and state transitions
-        3. Call game tools to execute valid actions
-        4. Provide clear feedback to players about rule violations
+        你是一个宝可梦集换式卡牌游戏（PTCG）裁判智能体。你的职责是：
+        1. 根据游戏规则验证玩家行动
+        2. 执行游戏规则和状态转换
+        3. 调用游戏工具来执行有效行动
+        4. 向玩家提供关于规则违反的清晰反馈
 
-        Always check rules before executing actions. If an action violates rules,
-        explain why and suggest alternatives.
+        在执行行动前，始终检查规则。如果行动违反规则，
+        请解释原因并建议替代方案。
 
-        When processing a player request:
-        1. First use validate_action to check if the action is valid
-        2. If valid, use execute_action to perform the action
-        3. If you need to check rules, use query_rule to search the knowledge base
-        4. Provide clear feedback about the result
+        处理玩家请求时：
+        1. 首先使用 validate_action 检查行动是否有效
+        2. 如果有效，使用 execute_action 执行行动
+        3. 如果需要检查规则，使用 query_rule 搜索知识库
+        4. 提供关于结果的清晰反馈
         """
         self.instructions = instructions or default_instructions
 
@@ -73,7 +73,7 @@ class RefereeAgentSDK:
             Dictionary with "output" key containing the agent's response
         """
         if "input" not in input_data:
-            raise ValueError("input_data must contain 'input' key")
+            raise ValueError("input_data 必须包含 'input' 键")
 
         # Format the input message
         if isinstance(input_data["input"], str):
@@ -83,7 +83,7 @@ class RefereeAgentSDK:
             player_id = input_data["input"].get("player_id", "unknown")
             action = input_data["input"].get("action", "")
             payload = input_data["input"].get("payload", {})
-            input_text = f"Player {player_id} requests action: {action} with payload: {payload}"
+            input_text = f"玩家 {player_id} 请求行动: {action}，参数: {payload}"
 
         # Prepare agent input
         agent_input = {
@@ -110,7 +110,7 @@ class RefereeAgentSDK:
                 output = str(result)
             return {"success": True, "output": output}
         except Exception as e:
-            logger.error(f"Error processing request: {e}", exc_info=True)
+            logger.error(f"处理请求时出错: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
     def stream(self, input_data: Dict[str, Any]):
@@ -125,7 +125,7 @@ class RefereeAgentSDK:
             Chunks of the agent's response
         """
         if "input" not in input_data:
-            raise ValueError("input_data must contain 'input' key")
+            raise ValueError("input_data 必须包含 'input' 键")
 
         # Format the input message
         if isinstance(input_data["input"], str):
@@ -134,7 +134,7 @@ class RefereeAgentSDK:
             player_id = input_data["input"].get("player_id", "unknown")
             action = input_data["input"].get("action", "")
             payload = input_data["input"].get("payload", {})
-            input_text = f"Player {player_id} requests action: {action} with payload: {payload}"
+            input_text = f"玩家 {player_id} 请求行动: {action}，参数: {payload}"
 
         # Prepare agent input
         agent_input = {
@@ -147,5 +147,5 @@ class RefereeAgentSDK:
             for chunk in self.agent.stream({"messages": [{"role": "user", "content": input_text}]}):
                 yield chunk
         except Exception as e:
-            logger.error(f"Error streaming request: {e}", exc_info=True)
+            logger.error(f"流式传输请求时出错: {e}", exc_info=True)
             yield {"error": str(e)}

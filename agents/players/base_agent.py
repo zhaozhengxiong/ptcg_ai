@@ -39,26 +39,26 @@ class PlayerAgentSDK:
         self.strategy = strategy
 
         default_instructions = f"""
-        You are a PTCG (Pokémon Trading Card Game) player agent using the {strategy} strategy.
-        Your goal is to win the game by:
-        1. Making optimal decisions based on the current game state
-        2. Managing your resources (cards, energy, prizes) effectively
-        3. Anticipating opponent moves
-        4. Adapting your strategy based on game state
+        你是一个使用 {strategy} 策略的宝可梦集换式卡牌游戏（PTCG）玩家智能体。
+        你的目标是通过以下方式赢得游戏：
+        1. 根据当前游戏状态做出最优决策
+        2. 有效管理你的资源（卡牌、能量、奖赏卡）
+        3. 预测对手的行动
+        4. 根据游戏状态调整你的策略
 
-        Analyze the game state carefully before making decisions. Consider:
-        - Your hand and deck composition
-        - Available Pokémon and their abilities
-        - Energy requirements for attacks
-        - Prize card count
-        - Opponent's board state (if visible)
+        在做出决策前，请仔细分析游戏状态。考虑以下因素：
+        - 你的手牌和牌库组成
+        - 可用的宝可梦及其能力
+        - 攻击所需的能量要求
+        - 奖赏卡数量
+        - 对手的场上状态（如果可见）
 
-        Make decisions that maximize your chances of winning.
+        做出能够最大化获胜机会的决策。
 
-        When making a decision:
-        1. Use analyze_game_state to understand the current situation
-        2. Use remember to store important observations for future reference
-        3. Use decide_action to choose your next move
+        在做出决策时：
+        1. 使用 analyze_game_state 来理解当前情况
+        2. 使用 remember 来存储重要的观察结果以供将来参考
+        3. 使用 decide_action 来选择你的下一步行动
         """
         self.instructions = instructions or default_instructions
 
@@ -82,7 +82,7 @@ class PlayerAgentSDK:
             OperationRequest if action is decided, None otherwise
         """
         # Format the observation as input
-        input_text = f"Current game state observation: {json.dumps(observation, default=str)}"
+        input_text = f"当前游戏状态观察: {json.dumps(observation, default=str)}"
 
         try:
             # LangChain 1.0 API: agent is a graph, invoke with messages
@@ -106,7 +106,7 @@ class PlayerAgentSDK:
             parsed_action = self._parse_action_from_response(output, observation)
             return parsed_action
         except Exception as e:
-            logger.error(f"Error making decision: {e}", exc_info=True)
+            logger.error(f"做出决策时出错: {e}", exc_info=True)
             # Fallback to base agent
             return self.base_agent.decide(observation)
 
@@ -119,14 +119,14 @@ class PlayerAgentSDK:
         Yields:
             Chunks of the agent's response
         """
-        input_text = f"Current game state observation: {json.dumps(observation, default=str)}"
+        input_text = f"当前游戏状态观察: {json.dumps(observation, default=str)}"
 
         try:
             # LangChain 1.0 API: stream with messages
             for chunk in self.agent.stream({"messages": [{"role": "user", "content": input_text}]}):
                 yield chunk
         except Exception as e:
-            logger.error(f"Error streaming decision: {e}", exc_info=True)
+            logger.error(f"流式传输决策时出错: {e}", exc_info=True)
             yield {"error": str(e)}
 
     def _parse_action_from_response(self, response_text: str, observation: Dict[str, Any]) -> Optional[Dict[str, Any]]:

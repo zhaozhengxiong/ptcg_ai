@@ -13,24 +13,24 @@ from src.ptcg_ai.referee import OperationRequest, RefereeAgent
 class ValidateActionInput(BaseModel):
     """Input schema for validate_action tool."""
 
-    action: str = Field(description="Action type (draw, discard, attack, etc.)")
-    player_id: str = Field(description="Player ID performing the action")
-    payload: Dict[str, Any] = Field(default_factory=dict, description="Action-specific parameters")
+    action: str = Field(description="行动类型（draw, discard, attack 等）")
+    player_id: str = Field(description="执行行动的玩家ID")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="行动特定的参数")
 
 
 class QueryRuleInput(BaseModel):
     """Input schema for query_rule tool."""
 
-    query: str = Field(description="Query string to search for in rules")
-    limit: int = Field(default=5, description="Maximum number of results")
+    query: str = Field(description="在规则中搜索的查询字符串")
+    limit: int = Field(default=5, description="最大结果数量")
 
 
 class ExecuteActionInput(BaseModel):
     """Input schema for execute_action tool."""
 
-    action: str = Field(description="Action to execute")
-    player_id: str = Field(description="Player ID")
-    payload: Dict[str, Any] = Field(default_factory=dict, description="Action parameters")
+    action: str = Field(description="要执行的行动")
+    player_id: str = Field(description="玩家ID")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="行动参数")
 
 
 def create_referee_tools(base_referee: RefereeAgent) -> list[StructuredTool]:
@@ -43,7 +43,7 @@ def create_referee_tools(base_referee: RefereeAgent) -> list[StructuredTool]:
         List of StructuredTool instances
     """
     def validate_action(action: str, player_id: str, payload: Dict[str, Any]) -> str:
-        """Validate a player action against game rules."""
+        """根据游戏规则验证玩家行动。"""
         request = OperationRequest(
             actor_id=player_id,
             action=action,
@@ -53,13 +53,13 @@ def create_referee_tools(base_referee: RefereeAgent) -> list[StructuredTool]:
         return json.dumps({"valid": result.success, "message": result.message})
 
     def query_rule(query: str, limit: int = 5) -> str:
-        """Query the rule knowledge base for relevant rules."""
+        """在规则知识库中查询相关规则。"""
         matches = base_referee.knowledge_base.find(query, limit=limit)
         results = [{"section": m.section, "text": m.text} for m in matches]
         return json.dumps(results)
 
     def execute_action(action: str, player_id: str, payload: Dict[str, Any]) -> str:
-        """Execute a validated action using game tools."""
+        """使用游戏工具执行已验证的行动。"""
         request = OperationRequest(
             actor_id=player_id,
             action=action,
@@ -71,21 +71,21 @@ def create_referee_tools(base_referee: RefereeAgent) -> list[StructuredTool]:
     validate_action_tool = StructuredTool.from_function(
         func=validate_action,
         name="validate_action",
-        description="Validate a player action against game rules. Returns validation result with success status and message.",
+        description="根据游戏规则验证玩家行动。返回包含成功状态和消息的验证结果。",
         args_schema=ValidateActionInput,
     )
 
     query_rule_tool = StructuredTool.from_function(
         func=query_rule,
         name="query_rule",
-        description="Query the rule knowledge base for relevant rules. Returns matching rule sections and text.",
+        description="在规则知识库中查询相关规则。返回匹配的规则章节和文本。",
         args_schema=QueryRuleInput,
     )
 
     execute_action_tool = StructuredTool.from_function(
         func=execute_action,
         name="execute_action",
-        description="Execute a validated action using game tools. Returns execution result with success status and data.",
+        description="使用游戏工具执行已验证的行动。返回包含成功状态和数据的执行结果。",
         args_schema=ExecuteActionInput,
     )
 
