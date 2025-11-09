@@ -1,0 +1,298 @@
+syntax = "proto3";
+
+package game_tools;
+
+// Game Tools service definition
+service GameToolsService {
+  // Deck and card queries
+  rpc DeckQuery(DeckQueryRequest) returns (DeckQueryResponse);
+  rpc RevealTop(RevealTopRequest) returns (RevealTopResponse);
+  
+  // Card movement
+  rpc MoveCard(MoveCardRequest) returns (MoveCardResponse);
+  rpc Shuffle(ShuffleRequest) returns (ShuffleResponse);
+  rpc Draw(DrawRequest) returns (DrawResponse);
+  rpc Discard(DiscardRequest) returns (DiscardResponse);
+  rpc TakePrize(TakePrizeRequest) returns (TakePrizeResponse);
+  rpc RandomDiscard(RandomDiscardRequest) returns (RandomDiscardResponse);
+  
+  // Zone queries
+  rpc QueryDiscard(QueryDiscardRequest) returns (QueryDiscardResponse);
+  rpc QueryPrizeCount(QueryPrizeCountRequest) returns (QueryPrizeCountResponse);
+  
+  // Enhanced operations
+  rpc SwapActiveWithBench(SwapActiveWithBenchRequest) returns (SwapActiveWithBenchResponse);
+  rpc ShuffleHandIntoDeck(ShuffleHandIntoDeckRequest) returns (ShuffleHandIntoDeckResponse);
+  rpc EvolvePokemon(EvolvePokemonRequest) returns (EvolvePokemonResponse);
+  
+  // Damage and combat
+  rpc UpdateDamage(UpdateDamageRequest) returns (UpdateDamageResponse);
+  rpc CheckKO(CheckKORequest) returns (CheckKOResponse);
+  
+  // Energy attachment
+  rpc AttachEnergy(AttachEnergyRequest) returns (AttachEnergyResponse);
+  
+  // Usage tracking
+  rpc TrackUsage(TrackUsageRequest) returns (TrackUsageResponse);
+  rpc GetUsageCount(GetUsageCountRequest) returns (GetUsageCountResponse);
+  
+  // Lost Zone operations
+  rpc SendToLostZone(SendToLostZoneRequest) returns (SendToLostZoneResponse);
+  rpc RevealPrize(RevealPrizeRequest) returns (RevealPrizeResponse);
+  rpc ModifyPrizeDelta(ModifyPrizeDeltaRequest) returns (ModifyPrizeDeltaResponse);
+  rpc SetSpecialCondition(SetSpecialConditionRequest) returns (SetSpecialConditionResponse);
+}
+
+// Common types
+message CardInfo {
+  string uid = 1;
+  string owner_id = 2;
+  string set_code = 3;
+  string number = 4;
+  string name = 5;
+  string card_type = 6;
+  int32 hp = 7;
+  string stage = 8;
+  int32 damage = 9;
+  repeated string attached_energy = 10;
+  repeated string special_conditions = 11;
+}
+
+message Zone {
+  string value = 1;
+}
+
+// Request/Response messages
+message DeckQueryRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string predicate_json = 3; // JSON representation of predicate
+}
+
+message DeckQueryResponse {
+  repeated CardInfo cards = 1;
+}
+
+message RevealTopRequest {
+  string match_id = 1;
+  string player_id = 2;
+  int32 count = 3;
+}
+
+message RevealTopResponse {
+  repeated CardInfo cards = 1;
+}
+
+message MoveCardRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string source_zone = 3;
+  string target_zone = 4;
+  string card_uid = 5;
+  int32 position_hint = 6;
+}
+
+message MoveCardResponse {
+  bool success = 1;
+}
+
+message ShuffleRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string zone = 3;
+}
+
+message ShuffleResponse {
+  bool success = 1;
+  string random_seed = 2;
+}
+
+message DrawRequest {
+  string match_id = 1;
+  string player_id = 2;
+  int32 count = 3;
+}
+
+message DrawResponse {
+  repeated CardInfo cards = 1;
+}
+
+message DiscardRequest {
+  string match_id = 1;
+  string player_id = 2;
+  repeated string card_uids = 3;
+  string reason = 4;
+}
+
+message DiscardResponse {
+  bool success = 1;
+}
+
+message TakePrizeRequest {
+  string match_id = 1;
+  string player_id = 2;
+  int32 count = 3;
+}
+
+message TakePrizeResponse {
+  repeated CardInfo cards = 1;
+  int32 remaining = 2;
+}
+
+message RandomDiscardRequest {
+  string match_id = 1;
+  string player_id = 2;
+  int32 count = 3;
+}
+
+message RandomDiscardResponse {
+  repeated CardInfo cards = 1;
+  string random_seed = 2;
+}
+
+message QueryDiscardRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string predicate_json = 3; // Optional
+}
+
+message QueryDiscardResponse {
+  repeated CardInfo cards = 1;
+}
+
+message QueryPrizeCountRequest {
+  string match_id = 1;
+  string player_id = 2;
+}
+
+message QueryPrizeCountResponse {
+  int32 count = 1;
+}
+
+message SwapActiveWithBenchRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string bench_card_id = 3;
+  bool opponent = 4;
+}
+
+message SwapActiveWithBenchResponse {
+  bool success = 1;
+}
+
+message ShuffleHandIntoDeckRequest {
+  string match_id = 1;
+  string player_id = 2;
+}
+
+message ShuffleHandIntoDeckResponse {
+  bool success = 1;
+}
+
+message EvolvePokemonRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string base_card_id = 3;
+  string evolution_card_id = 4;
+  bool skip_stage1 = 5;
+}
+
+message EvolvePokemonResponse {
+  bool success = 1;
+}
+
+message UpdateDamageRequest {
+  string match_id = 1;
+  string pokemon_id = 2;
+  int32 delta = 3;
+}
+
+message UpdateDamageResponse {
+  bool success = 1;
+  int32 new_damage = 2;
+}
+
+message CheckKORequest {
+  string match_id = 1;
+  string pokemon_id = 2;
+}
+
+message CheckKOResponse {
+  bool is_ko = 1;
+  bool prize_taken = 2;
+}
+
+message AttachEnergyRequest {
+  string match_id = 1;
+  string energy_card_id = 2;
+  string target_pokemon_id = 3;
+}
+
+message AttachEnergyResponse {
+  bool success = 1;
+}
+
+message TrackUsageRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string entity_id = 3;
+  string counter_type = 4;
+  string scope = 5;
+}
+
+message TrackUsageResponse {
+  bool success = 1;
+}
+
+message GetUsageCountRequest {
+  string match_id = 1;
+  string player_id = 2;
+  string entity_id = 3;
+  string counter_type = 4;
+  string scope = 5;
+}
+
+message GetUsageCountResponse {
+  int32 count = 1;
+}
+
+message SendToLostZoneRequest {
+  string match_id = 1;
+  string card_id = 2;
+}
+
+message SendToLostZoneResponse {
+  bool success = 1;
+}
+
+message RevealPrizeRequest {
+  string match_id = 1;
+  string player_id = 2;
+  int32 count = 3;
+}
+
+message RevealPrizeResponse {
+  repeated CardInfo cards = 1;
+}
+
+message ModifyPrizeDeltaRequest {
+  string match_id = 1;
+  string player_id = 2;
+  int32 delta = 3;
+}
+
+message ModifyPrizeDeltaResponse {
+  bool success = 1;
+  int32 new_count = 2;
+}
+
+message SetSpecialConditionRequest {
+  string match_id = 1;
+  string pokemon_id = 2;
+  string condition = 3;
+}
+
+message SetSpecialConditionResponse {
+  bool success = 1;
+}
+

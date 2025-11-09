@@ -1,7 +1,65 @@
+# Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.csr
+infra/certs/*.pem
+infra/certs/*.key
+
+# Environment
 .env
-.venv
-.pytest_cache/
+.env.local
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+.pids/
+
+# Node
+node_modules/
+.next/
+out/
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db

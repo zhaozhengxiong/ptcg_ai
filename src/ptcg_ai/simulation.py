@@ -265,20 +265,20 @@ def build_deck(owner_id: str, deck_file: str | Path, dsn: Optional[str] = None) 
     except ValueError as e:
         # Print detailed error information
         print("\n" + "="*60)
-        print("DECK PARSING ERROR")
+        print("卡组解析错误")
         print("="*60)
-        print(f"\nDeck file: {path}")
-        print(f"Owner: {owner_id}")
-        print(f"\nCard Statistics:")
-        print(f"  Total cards requested: {total_requested}")
-        print(f"  Total cards loaded: {total_loaded}")
-        print(f"  Missing cards: {60 - total_loaded}")
-        print(f"\nCards by type:")
+        print(f"\n卡组文件: {path}")
+        print(f"所有者: {owner_id}")
+        print(f"\n卡牌统计:")
+        print(f"  请求的卡牌总数: {total_requested}")
+        print(f"  已加载的卡牌数: {total_loaded}")
+        print(f"  缺失的卡牌数: {60 - total_loaded}")
+        print(f"\n按类型分类:")
         for card_type, count in sorted(card_type_counts.items()):
             print(f"  {card_type}: {count}")
         
         if failed_cards:
-            print(f"\nFailed to load {len(failed_cards)} card type(s):")
+            print(f"\n无法加载 {len(failed_cards)} 种卡牌类型:")
             # Group by line ranges
             for (start_line, end_line), cards_list in sorted(failed_by_range.items()):
                 if start_line == end_line:
@@ -288,12 +288,12 @@ def build_deck(owner_id: str, deck_file: str | Path, dsn: Optional[str] = None) 
                 print(f"\n  {location}:")
                 for failed in cards_list:
                     print(f"    - {failed['count']}x {failed['card_name']} ({failed['set_code']} {failed['number']})")
-                    print(f"      Original line: {failed['original_line']}")
+                    print(f"      原始行: {failed['original_line']}")
         
         if parse_errors:
-            print(f"\nParse Errors ({len(parse_errors)}):")
+            print(f"\n解析错误 ({len(parse_errors)}):")
             for i, error in enumerate(parse_errors, 1):
-                print(f"\n  Error {i}:")
+                print(f"\n  错误 {i}:")
                 print(f"  {error}")
         
         print("\n" + "="*60)

@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ptcg
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  game-tools:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.game_tools
+    ports:
+      - "50051:50051"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: ptcg
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  simulator-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.simulator_api
+    ports:
+      - "8000:8000"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: ptcg
+    depends_on:
+      postgres:
+        condition: service_healthy
+      game-tools:
+        condition: service_started
+
+  rule-kb:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.rule_kb
+    ports:
+      - "8001:8001"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: ptcg
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+

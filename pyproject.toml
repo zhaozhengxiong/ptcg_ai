@@ -1,0 +1,50 @@
+[project]
+name = "ptcg-agents"
+version = "0.1.0"
+description = "PTCG AI battle and referee system"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary]>=3.1.0",
+    "asyncpg>=0.29.0",
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "openai>=1.12.0",
+    "pgvector>=0.2.0",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "langchain-anthropic>=0.1.0",
+    "langchain-community>=0.0.20",
+    "kafka-python>=2.0.2",
+    "opentelemetry-api>=1.22.0",
+    "opentelemetry-sdk>=1.22.0",
+    "opentelemetry-instrumentation-grpc>=0.43b0",
+    "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "opentelemetry-exporter-prometheus>=0.59b0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "playwright>=1.40.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "black>=23.12.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+

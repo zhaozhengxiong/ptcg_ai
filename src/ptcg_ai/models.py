@@ -42,9 +42,24 @@ class CardInstance:
     uid: str
     owner_id: str
     definition: CardDefinition
+    damage: int = 0  # Current damage on this card (for Pokémon)
+    attached_energy: List[str] = field(default_factory=list)  # List of energy card UIDs attached to this card
+    special_conditions: List[str] = field(default_factory=list)  # Special conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)
 
     def __hash__(self) -> int:  # pragma: no cover - delegated to uid
         return hash(self.uid)
+    
+    @property
+    def hp(self) -> Optional[int]:
+        """Get HP value from definition."""
+        return self.definition.hp
+    
+    @property
+    def is_ko(self) -> bool:
+        """Check if this Pokémon is knocked out (damage >= HP)."""
+        if self.hp is None:
+            return False
+        return self.damage >= self.hp
 
 
 @dataclass
@@ -85,9 +100,33 @@ class PlayerState:
     zones: Dict[Zone, ZoneState] = field(default_factory=lambda: {zone: ZoneState() for zone in Zone})
     prizes_remaining: int = 6
     memory: List[str] = field(default_factory=list)
+    usage_trackers: Dict[str, Dict[str, int]] = field(default_factory=dict)  # Track usage: {entity_id: {counter_type: count}}
 
     def zone(self, zone: Zone) -> ZoneState:
         return self.zones.setdefault(zone, ZoneState())
+    
+    def track_usage(self, entity_id: str, counter_type: str, scope: str = "turn") -> None:
+        """Track usage of an ability/attack. Scope can be 'turn' or 'game'."""
+        if entity_id not in self.usage_trackers:
+            self.usage_trackers[entity_id] = {}
+        key = f"{scope}:{counter_type}"
+        self.usage_trackers[entity_id][key] = self.usage_trackers[entity_id].get(key, 0) + 1
+    
+    def get_usage_count(self, entity_id: str, counter_type: str, scope: str = "turn") -> int:
+        """Get usage count for an ability/attack."""
+        if entity_id not in self.usage_trackers:
+            return 0
+        key = f"{scope}:{counter_type}"
+        return self.usage_trackers[entity_id].get(key, 0)
+    
+    def reset_turn_usage(self) -> None:
+        """Reset all turn-scoped usage trackers (called at end of turn)."""
+        for entity_id in list(self.usage_trackers.keys()):
+            turn_keys = [k for k in self.usage_trackers[entity_id].keys() if k.startswith("turn:")]
+            for key in turn_keys:
+                del self.usage_trackers[entity_id][key]
+            if not self.usage_trackers[entity_id]:
+                del self.usage_trackers[entity_id]
 
 
 @dataclass

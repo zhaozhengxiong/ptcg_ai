@@ -9,6 +9,7 @@ from .models import (
     Zone,
 )
 from .game_tools import GameTools
+from .card_effects import EffectContext, EffectExecutor
 from .referee import RefereeAgent
 from .player import PlayerAgent
 from .rulebook import RuleKnowledgeBase
@@ -22,6 +23,8 @@ __all__ = [
     "GameState",
     "Zone",
     "GameTools",
+    "EffectContext",
+    "EffectExecutor",
     "RefereeAgent",
     "PlayerAgent",
     "RuleKnowledgeBase",
