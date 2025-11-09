@@ -18,6 +18,7 @@ src/ptcg_ai/         # 核心源码
 tests/               # pytest 测试
 doc/                 # 需求文档、规则 PDF、官方卡牌 JSON 数据
 data_back_up/        # PostgreSQL 示例备份（schema & 初始数据）
+extract_rulebook.py  # 规则书 PDF 提取脚本
 ```
 
 ### 核心模块速览
@@ -37,6 +38,7 @@ data_back_up/        # PostgreSQL 示例备份（schema & 初始数据）
 
 - `doc/requirement.md`：产品/系统需求全貌（架构、角色、工具原语、安全约束、流程示例）。
 - `doc/par_rulebook_en.pdf`：官方规则 PDF（需先转成文本再喂给 `RuleKnowledgeBase`）。
+- `doc/rulebook_extracted.txt`：从 PDF 提取的规则文本（可通过 `extract_rulebook.py` 生成）。
 - `doc/cards/en/*.json`：多版本官方卡牌数据，可按需挑选集合。
 - `data_back_up/ptcg_backup.sql`：PostgreSQL schema 及部分示例数据，方便搭建真实的日志/对局存储。
 
@@ -53,7 +55,21 @@ pip install -e .
 
 > 若只做内存级开发，可不安装 psycopg，`DatabaseClient` 会自动回退到 `InMemoryDatabase`。
 
-### 2. 运行测试
+### 2. 提取规则书文本（首次运行需要）
+
+如果 `doc/rulebook_extracted.txt` 不存在，需要先从 PDF 提取规则文本：
+
+```bash
+# 安装 PyMuPDF（用于 PDF 文本提取）
+pip install PyMuPDF
+
+# 运行提取脚本
+python extract_rulebook.py
+```
+
+脚本会从 `doc/par_rulebook_en.pdf` 提取文本并保存到 `doc/rulebook_extracted.txt`，同时显示提取进度和统计信息。
+
+### 3. 运行测试
 
 ```bash
 pytest
@@ -61,7 +77,7 @@ pytest
 
 当前用例集中验证了 60 张唯一 UID 的套牌合法性。可据此扩展更多规则与流程验证。
 
-### 3. 最小示例
+### 4. 最小示例
 
 ```python
 from pathlib import Path
@@ -90,12 +106,32 @@ run_turn(referee, players)
 3. 由裁判完成初始化、洗牌、发奖赏卡；
 4. 调用 `run_turn` 让玩家代理提交操作，并通过裁判完成验证与日志记录。
 
+## 工具脚本
+
+### 规则书提取脚本
+
+`extract_rulebook.py` 用于从 PDF 规则书提取文本：
+
+- **功能**：使用 PyMuPDF 从 `doc/par_rulebook_en.pdf` 提取文本
+- **输出**：生成 `doc/rulebook_extracted.txt` 供 `RuleKnowledgeBase` 使用
+- **特性**：
+  - 自动清理多余空白行
+  - 显示提取进度和统计信息
+  - 检测符合规则格式的条目（以数字编号开头的行）
+  - 提供详细的错误提示
+
+**使用方法**：
+```bash
+pip install PyMuPDF
+python extract_rulebook.py
+```
+
 ## 开发建议与下一步
 
 1. **扩充 Game Tools**：根据 `doc/requirement.md` 中的原语清单，继续为状态异常、特殊规则、附件结算等场景添加底层操作。
 2. **丰富 PlayerAgent 策略**：可接入强化学习、蒙特卡洛搜索或检索式提示，结合 `PlayerMemory` 形成连贯决策。
 3. **落地 PostgreSQL**：利用 `data_back_up/ptcg_backup.sql` 恢复数据库，完善 `match_logs`、`matches` 等表的 schema，并将 `DatabaseClient` 切换到真实实例。
-4. **规则知识库自动化**：构建 PDF -> 文本/JSON 的抽取脚本，定期刷新 `RuleKnowledgeBase`，支持更精准的章节检索。
+4. **规则知识库增强**：改进 `extract_rulebook.py` 以支持更精准的章节识别和结构化提取，或集成向量检索以提升规则匹配精度。
 
 ## 相关文档
 

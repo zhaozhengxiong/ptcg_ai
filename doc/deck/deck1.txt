@@ -1,5 +1,5 @@
 Pokémon: 17
-2 Pidgey MEW 16
+2 Pidgey PAF 196
 2 Charmander PAF 7
 1 Mew CEL 11
 1 Jirachi PAR 126
@@ -30,3 +30,6 @@ Trainer: 37
 1 Switch SVI 194
 1 Professor Turo's Scenario PRE 121
 3 Rare Candy SVI 191
+
+Energy: 6
+6 Fire Energy SVE 2
